@@ -4,8 +4,8 @@
 
 //#define DEBUG 1
 
-#define WIFI_SSID "Voyager 30" //	"TALKTALK96DCBC"//"realme 6"//"Voyager 30"
-#define WIFI_PASSWORD "if6tdt5q" //"PC7HX67T"	//"elf2bonchance"//"if6tdt5q"
+#define WIFI_SSID "Wifi name" //	
+#define WIFI_PASSWORD "password" //
 
 
 
