@@ -4,32 +4,11 @@
 
 //#define DEBUG 1
 
-#define WIFI_SSID "Voyager 30" //	"TALKTALK96DCBC"//"realme 6"//"Voyager 30"
-#define WIFI_PASSWORD "if6tdt5q" //"PC7HX67T"	//"elf2bonchance"//"if6tdt5q"
-
-
-
-// defines for now should be changed based on forcast
-#define FLAT_RATE_TARIF 35 // never want to pay more than this per unit
-// folowing 2 values are modified as SOC falles up to x2 at 20% soc  
-#define PRICE_LOW_ALLOW_BATTERY_EXTEND 15 //   *2 at 20% soc if cost is less than this power will come from grid not battery when load is small
-#define PRICE_LOW_ALLOW_BATTERY_SAVE 10 // when the price is below this the mains will be used to save battery charge
-#define PRICE_LOW_INCRESE_CHARGING_TIME 9 // if price is less than this then allow more power to be stored than reqiored for today
-#define BATTERY_SIZE 11900.0 // the capasity of the battery in W
-#define BATTERY_EFF 84.0 // efficience of inverter ie 1KW in 0.84KW
-#define SEED_POWER_USE 3000 // W's required to add to battery/day. 
-                            // This is a starting point the actuel value will be based on history once the cpu has been running for a few days
-#define TEMPRATUER_COMPENSATION 220 // If you have electrical heating The power use is havely dependent on outside tempretuer. This value modifies
-                                    // the reqired_power = required_powet + (deltaT * TEMPRATUER_COMPENSATION). Set to zero to disable
-#define SOLAR_PANEL_COFF 0.4 // This is multiplied by the forcast solor radiation for 1m squerd. To get this value use number_of_m_sq_solar_panls/ panel efficiency ()
-                              // eg 4m sq of soler panels with 12% efficiensy would be 4/12 = 0.33. To play safe when the forcast isent good you can make this number smaller
-                              // if too big you may run out power at peak time. If to low you may reach 100% charge and export to grid having bought too much power the night before.
-
-#define TIME_URL "https://worldtimeapi.org/api/ip"
-// change for your reagen and tarref
-#define OCTOPUSS_URL "https://api.octopus.energy/v1/products/AGILE-FLEX-22-11-25/electricity-tariffs/E-1R-AGILE-FLEX-22-11-25-J/standard-unit-rates/"
-#define WETHER_URL "https://api.open-meteo.com/v1/forecast?latitude=51.003293&longitude=0.396079&daily=apparent_temperature_max,apparent_temperature_min,sunshine_duration&forecast_days=3"
 #define DATA_TO_SS "https://script.google.com/macros/s/AKfycbyufeQCFAvoOzhuiEZw0fGEf0NNo_0-t7f5ZgHkvI1ymZ5vtVDKWg7v3h3SFcRoJMkGhQ/exec?temperature=20.00&humidity=1.00"
+
+
+#define SEED_POWER_USE 3000 // W's required to add to battery/day. 
+#define TIME_URL "https://worldtimeapi.org/api/ip"
 
 // defines used for forcast and implementation
 #define CHARGE  1
@@ -44,7 +23,7 @@
  // Update these to match your inverter/network.
 #define INVERTER_ME3000				// Uncomment for ME3000
 //#define INVERTER_HYBRID			// Uncomment for Hybrid
-//#define DEBUG
+
 #ifdef INVERTER_ME3000
 #define	MAX_POWER		3000.0		// ME3000 is 3000W max.
 #elif defined INVERTER_HYBRID
@@ -131,6 +110,8 @@
 #include <Adafruit_GFX.h>
 #include "Adafruit_ILI9341.h"
 #include <XPT2046_Touchscreen.h>
+#include "FS.h"
+#include "SD.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
 
@@ -161,6 +142,8 @@
 // Touch Screen pins
 // ----------------------------
 // The CYD touch uses some non defaultspi pins
+#define FSPI  1 //SPI bus attached to the flash (can use the same data lines but different SS)
+#define HSPI  2 //SPI bus normally mapped to pins 12 - 15, but can be matrixed to any pins
 #define VSPI  3 //SPI bus normally attached to pins 5, 18, 19 and 23, but can be matrixed to any pins
 #define XPT2046_IRQ 36
 #define XPT2046_MOSI 32
@@ -214,7 +197,7 @@ int yesterdays_power_use; // the power taken from the battery previusly used for
 int8_t yesterdays_outside_min_temp;
 int today_solar_energy;
 
-uint8_t hhours_cost_high; // number of periods the cost is above set limit 35p??
+//uint8_t hhours_cost_high; // number of periods the cost is above set limit 35p??
 int8_t outside_min_temp; // from yesterdays forcast
 float cheapest; // lowest cost found in data
 uint8_t cheapest_at; // the x location in the array wher cheapest is to be found
@@ -265,5 +248,8 @@ void get_tomorrows_web_data(void);
 void day_update(void);
 void send_ss_hh_data(int plan, int soc, float periods_of_charge, float total_charging_cost);
 void send_ss_day_data(int today_solar_energy, int pv_day, int soc, int load_day, int forcast_power_rec ); // log data 
+void log_SD_day_data(int today_solar_energy, int pv_day, int soc, int load_day, int forcast_power_rec );
+void log_SD_hh_data(int plan, int soc, float periods_of_charge, float total_charging_cost);
 int8_t do_buttons(void);
+void read_settings_file( const char * path);
 #endif

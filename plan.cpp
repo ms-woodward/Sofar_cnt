@@ -5,20 +5,26 @@ Sofar2mqtt/set/auto   - send value "true" or "battery_save"
 Sofar2mqtt/set/charge   - send values in the range 0-3000 (watts)
 Sofar2mqtt/set/discharge   - send values in the range 0-3000 (watts)
 
-Each of the above will return a response on:
-Sofar2mqtt/response/<function>,
 
 */
 #include "main.h"
-//store arange of usfull values in on place
 
 
 extern WiFiClient wifi;
 extern Stats stats;
 extern Current_time now;
-extern Octopuss cost_array[71]; // store all cost data for next day or 2
+extern Octopuss cost_array[]; // store all cost data for next day or 2
 extern Adafruit_ILI9341 tft;
-extern uint8_t log_data; // flags to say if data should be loged
+extern uint8_t LOG_DATA; // flags to say if data should be loged
+extern char OCTOPUS_URL[];
+extern char WETHER_URL[];
+extern int PRICE_LOW_ALLOW_BATTERY_EXTEND;
+extern int PRICE_LOW_ALLOW_BATTERY_SAVE;
+extern int PRICE_LOW_INCREASE_CHARGING_TIME;
+extern int TEMPERATURE_COMPENSATION;
+extern float SOLAR_PANEL_COFF;
+extern float BATTERY_SIZE;
+extern float  BATTERY_EFF;
 /////////////////////////////////////////////////////////////////////////////////////////////
 //
 //
@@ -44,7 +50,7 @@ extern uint8_t log_data; // flags to say if data should be loged
     // Stage 1 
   updateOLED(NULL, NULL, "New PLan     ", "             ");
   stats.cheapest = 200;
-  stats.hhours_cost_high =0;
+ // stats.hhours_cost_high =0;
   getTime(); // update so time is definatly past the 00 or 30 minutes
   stats.max_cost = 0; 
   for(x=0;x<70;x++)
@@ -57,8 +63,8 @@ extern uint8_t log_data; // flags to say if data should be loged
       }
     if(cost_array[x].cost > stats.max_cost)
       stats.max_cost = cost_array[x].cost;
-    if(cost_array[x].cost > FLAT_RATE_TARIF) // count how long we will have to supply power
-      stats.hhours_cost_high++;
+    //if(cost_array[x].cost > FLAT_RATE_TARIF) // count how long we will have to supply power
+    //  stats.hhours_cost_high++;
 
     if(cost_array[x].sec_from_midnight < now.sec_from_midnight && cost_array[x].date == now.date) //now
       {
@@ -84,8 +90,8 @@ extern uint8_t log_data; // flags to say if data should be loged
    Serial.print("About to enter while loop cheepest is ");
    Serial.println(cost_array[y].cost);
   while(periods_of_charge < req_periods_to_charge                                               // we nead it
-          || (PRICE_LOW_INCRESE_CHARGING_TIME > cost_array[y].cost && stats.resulting_soc < 60 ) // its cheep
-          || ((PRICE_LOW_INCRESE_CHARGING_TIME/2) > cost_array[y].cost && stats.resulting_soc < 80 ) 
+          || (PRICE_LOW_INCREASE_CHARGING_TIME > cost_array[y].cost && stats.resulting_soc < 60 ) // its cheep
+          || ((PRICE_LOW_INCREASE_CHARGING_TIME/2) > cost_array[y].cost && stats.resulting_soc < 80 ) 
           || (0.1 > cost_array[y].cost && stats.resulting_soc < 99 ))                            // its free
   {
     n++;
@@ -134,18 +140,18 @@ extern uint8_t log_data; // flags to say if data should be loged
   // this is when the load is low and the cost resanabul also depends on soc
   int price_low_allow_battery_extend  = PRICE_LOW_ALLOW_BATTERY_EXTEND + (PRICE_LOW_ALLOW_BATTERY_EXTEND * ((float)(100.0-soc))/80);
   int price_low_allow_battery_save  = PRICE_LOW_ALLOW_BATTERY_SAVE + (PRICE_LOW_ALLOW_BATTERY_SAVE * ((float)(100.0-soc))/80);
-#ifdef DEBUG
+//#ifdef DEBUG
   dtostrf(price_low_allow_battery_extend,4,2, buf2);
   sprintf(buf,"Battery extend at cost below %s",buf2);
   Serial.println(buf);
   dtostrf(price_low_allow_battery_save,4,2, buf2);
   sprintf(buf,"Battery save at cost below %s",buf2);
   Serial.println(buf);
-#endif
+//#endif
  getTime();
  for(x=9;x<now.array_now+1;x++)
     { 
-      if(stats.cheapest > 0)  // this stopes us buying power just before it is free
+      if(stats.cheapest > 0 || stats.cheapest_at > x)  // this stopes us buying power just before it is free
       {
         if(cost_array[x].cost < price_low_allow_battery_extend && ((cost_array[x].plan & 0xF) & CHARGE) == 0) // if cheap and not charging  
         {  
@@ -184,8 +190,10 @@ Serial.println("Cost  battery extend  battery save  charge");
     
     getTime(); // refresh as log file can take a long time
      // an optinal log file adding a line every 30 minutes
-    if((log_data&1) == 1)
+    if((LOG_DATA&1) == 1)
         send_ss_hh_data( cost_array[now.array_now].plan,  soc,  ((float)periods_of_charge/2), stats.total_charging_cost);
+    
+    log_SD_hh_data( cost_array[now.array_now].plan,  soc,  ((float)periods_of_charge/2), stats.total_charging_cost);    
     getTime();
  }
 
@@ -233,7 +241,7 @@ int calc_power_required(void) // assumes no sun
  forcast_power_recquired = forcast_power_recquired - stats.estemated_solar_power;
   // adjust for tempretuer if its colder than yesterday we will probably want more power and if warmer less power
   deltaT = stats.outside_min_temp - stats.yesterdays_outside_min_temp;
-  forcast_power_recquired = forcast_power_recquired + (deltaT * TEMPRATUER_COMPENSATION);
+  forcast_power_recquired = forcast_power_recquired + (deltaT * TEMPERATURE_COMPENSATION);
 
 // adjust for very cheap power is done in plan_control() not here
  
@@ -250,7 +258,7 @@ int calc_power_required(void) // assumes no sun
    
    if(req_power > BATTERY_SIZE-available_power) // want more than will fit in battery
    {
-    if(stats.cheapest < PRICE_LOW_INCRESE_CHARGING_TIME)
+    if(stats.cheapest < PRICE_LOW_INCREASE_CHARGING_TIME)
       req_power = BATTERY_SIZE - available_power ; // its cheap so will charge to 100%
     else // hope for sunsine or use less!
        req_power = (BATTERY_SIZE - available_power)*0.8; // charge to 80%
@@ -284,7 +292,7 @@ void get_tomorrows_web_data(void)
     //Serial.print("Octopus ");
     updateOLED(NULL, NULL, "HTTP Octopus ", "Downloading? ");
     getTime();
-    get_web_data(OCTOPUSS_URL,'o');//get_cost_data(); // call once a day about 5:00PM then try every 1/2 hour untill sucsesful
+    get_web_data(OCTOPUS_URL,'o');//get_cost_data(); // call once a day about 5:00PM then try every 1/2 hour untill sucsesful
     //Serial.print("Forcast      ");
     updateOLED(NULL, NULL, "HTTP Forcast ", NULL);
     getTime();
@@ -309,11 +317,14 @@ void day_update(void)
 
 // log file
  
-  if((log_data&2) == 2)
+  if((LOG_DATA&2) == 2)
   {
     getTime();
     send_ss_day_data(stats.today_solar_energy, get_inverter_value(SOFAR_REG_PVDAY), get_inverter_value(SOFAR_REG_BATTSOC), get_inverter_value(SOFAR_REG_LOADDAY),stats.forcast_power_rec ); // log data 
   }
+ if((LOG_DATA&4) == 4)
+    log_SD_day_data(stats.today_solar_energy, get_inverter_value(SOFAR_REG_PVDAY), get_inverter_value(SOFAR_REG_BATTSOC), get_inverter_value(SOFAR_REG_LOADDAY),stats.forcast_power_rec ); // log data 
+      
  getTime();
 }
 
