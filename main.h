@@ -110,7 +110,7 @@
 #include <Adafruit_GFX.h>
 #include "Adafruit_ILI9341.h"
 #include <XPT2046_Touchscreen.h>
-#include "FS.h"
+//#include "FS.h"
 #include "SD.h"
 #include <WiFi.h>
 #include <HTTPClient.h>

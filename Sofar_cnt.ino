@@ -71,10 +71,7 @@ calcCRC by angelo.compagnucci@gmail.com and jpmzometa@gmail.com
 // Wifi parameters.
 WiFiClient wifi;
 WiFiClientSecure client; // Create a WiFiClientSecure object
-// web parameters
-//#include <PubSubClient.h>
-//const char* mqttClientID = deviceName;
-//PubSubClient mqtt(wifi);
+
 SPIClass spi_sd = SPIClass(VSPI);
 SPIClass mySpi = SPIClass(HSPI); // touch screen spi
 XPT2046_Touchscreen ts(XPT2046_CS, XPT2046_IRQ);
@@ -151,9 +148,6 @@ Bit 0 - Charge enabled
 Bit 1 - Discharge enabled
 Bit 2 - Battery full, charge prohibited
 Bit 3 - Battery flat, discharge prohibited
-
-For example, a publish to Sofar2mqtt/set/charge will result in one on Sofar2mqtt/response/charge.
-AND the message with 0xff to get the result code, which should be 0.
 
 */
 ///////////////////////////////////////////////////////////////////////////////
@@ -501,7 +495,7 @@ void setup()
   stats.outside_min_temp = 15;
   stats.resulting_soc = 50;
 
-	delay(500);
+	//delay(500);
 
 	//Turn on the screen
 	tft.begin();  // initialise screen  
@@ -552,14 +546,18 @@ void setup()
   implement_control(); // implement strategy when required
  // sendPassiveCmd(SOFAR_SLAVE_ID,SOFAR_FN_STANDBY , 0, "stand_by"); 
 }
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void loop()
 {
   int l,soc;
   int8_t up_down=0;
   char buf[30];
   char wifi_buf[30];
-  static uint8_t next_adj_time = 0;
+  static uint8_t next_adj_time = 30;
   static int wifi_status = -1;
   getTime();
 
@@ -582,14 +580,14 @@ if(now.min == next_adj_time) // do on the hour and 1/2 hour
   implement_control(); // implement strategy when required
 }
 
- if(wifi_status != WiFi.status()) // state has changed
+ /*if(wifi_status != WiFi.status()) // state has changed
   {
     wifi_status = WiFi.status();  
     if(WiFi.status() != WL_CONNECTED) 
       strcpy(wifi_buf,"Offline      ");
     else
       strcpy(wifi_buf,"Online       ");
-  }
+  } */
   
   soc = (int)get_inverter_value(SOFAR_REG_BATTSOC) ; 
   sprintf(buf,"SOC %3d     ",soc);
@@ -601,7 +599,7 @@ if(now.min == next_adj_time) // do on the hour and 1/2 hour
  //digitalWrite(RELAY_PIN, LOW); 
 // delay(4000);
  // digitalWrite(RELAY_PIN, HIGH); 
-
+//log_SD_hh_data(2, 4, 3.6, 0.5);
 
   // check if user tuched the screen
   for(l=0;l<100;l++)
@@ -719,35 +717,42 @@ if(strncmp("BATTERY_EFF",buf,strlen("BATTERY_EFF"))== 0)
 void log_SD_day_data(int today_solar_energy, int pv_day, int soc, int load_day, int forcast_power_rec )
 {
   static char path[] = "/day_log.csv";
-  bool file_append = SD.exists(path);
   char buf[100];
-
+return;
   File file = SD.open(path, FILE_APPEND);
   if (!file) 
     {
     Serial.println("Failed to open file for appending");
     return;
     }
-  if(!file_append) // new file so add titls
+  if(!SD.exists(path)) // new file so add titls
     file.print("Date, solar_forcast, solar gen, soc, forcast_power, power_used\n");
   sprintf(buf,"%d, %d, %d, %d, %d, %d\n",now.date,today_solar_energy, pv_day, soc, forcast_power_rec,load_day );
+  file.print(buf);
   file.close();
 }
 
 void log_SD_hh_data(int plan, int soc, float periods_of_charge, float total_charging_cost)
 {
-  static char path[] = "/hh_log.csv";
-  bool file_append = SD.exists(path);
+  //static char path[] = "/hh_log.csv";
   char buf[100];
+  char buf2[20];
+  char buf3[20];
+  File afile;
 
-  File file = SD.open(path, FILE_APPEND);
-  if (!file) 
+ afile = SD.open("/hh_log.csv", FILE_APPEND);
+  if (!afile) 
     {
     Serial.println("Failed to open file for appending");
     return;
     }
-  if(!file_append) // new file so add titls
-    file.print("Date, time, planed_actions,  soc, futuer periods_of_charge, total_day_charging_cost\n");
-  sprintf(buf,"%d, %d:%d, %d, %d, %f %f\n",now.date,now.hour,now.min,plan, soc, periods_of_charge, total_charging_cost);
-  file.close();
+
+ // if(!SD.exists(path)) // new file so add titls
+ //   file.print("Date, time, planed_actions,  soc, futuer periods_of_charge, total_day_charging_cost\n");
+  //dtostrf(total_charging_cost,4,2, buf2);   
+ // dtostrf( periods_of_charge,4,1, buf3); 
+ // sprintf(buf,"%d, %d:%d, %d, %d, %s, %s\n",now.date, now.hour, now.min, plan, soc,buf3, buf2);
+//  file.print(buf);
+if (afile) 
+  afile.close();
 }

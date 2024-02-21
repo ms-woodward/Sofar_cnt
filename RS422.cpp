@@ -1,10 +1,7 @@
-#include <dummy.h>
-#include <StreamUtils.h>
-#include "main.h"
-//#include <SoftwareSerial.h>
+//#include <dummy.h>
 
-//extern SoftwareSerial Serial2; // veriable
-// SoftwareSerial Serial2(RXPin, TXPin);
+#include "main.h"
+
 /**
  * Flush the RS485 buffers in both directions. The doc for Serial.flush() implies it only
  * flushes outbound characters now... I assume Serial2 is the same.

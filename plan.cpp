@@ -24,7 +24,7 @@ extern int PRICE_LOW_INCREASE_CHARGING_TIME;
 extern int TEMPERATURE_COMPENSATION;
 extern float SOLAR_PANEL_COFF;
 extern float BATTERY_SIZE;
-extern float  BATTERY_EFF;
+extern float BATTERY_EFF;
 /////////////////////////////////////////////////////////////////////////////////////////////
 //
 //
@@ -128,26 +128,27 @@ extern float  BATTERY_EFF;
      Serial.println(buf);
     periods_of_charge++;
   } // end while
-  //periods_of_charge--; // we aded one to many on the way out of the while loop??????
+  
     char buf3[6];    
     dtostrf(((float)periods_of_charge/2),3,1, buf3); // Charging for 1h to get to 30% soc, costing 30.4p
     sprintf(buf,"Charging for %sh to get",buf3);
     dtostrf(stats.total_charging_cost,4,2, buf3);   
     sprintf(buf2,"to %d%% SOC, costing %sp ",stats.resulting_soc, buf3);
     update_plan_screen(NULL,NULL,NULL,&buf[0], &buf2[0],NULL);
+
   // Stage 3 
   // work out when we should buy a little instead of using the battery
   // this is when the load is low and the cost resanabul also depends on soc
   int price_low_allow_battery_extend  = PRICE_LOW_ALLOW_BATTERY_EXTEND + (PRICE_LOW_ALLOW_BATTERY_EXTEND * ((float)(100.0-soc))/80);
   int price_low_allow_battery_save  = PRICE_LOW_ALLOW_BATTERY_SAVE + (PRICE_LOW_ALLOW_BATTERY_SAVE * ((float)(100.0-soc))/80);
-//#ifdef DEBUG
+#ifdef DEBUG
   dtostrf(price_low_allow_battery_extend,4,2, buf2);
   sprintf(buf,"Battery extend at cost below %s",buf2);
   Serial.println(buf);
   dtostrf(price_low_allow_battery_save,4,2, buf2);
   sprintf(buf,"Battery save at cost below %s",buf2);
   Serial.println(buf);
-//#endif
+#endif
  getTime();
  for(x=9;x<now.array_now+1;x++)
     { 
@@ -158,7 +159,7 @@ extern float  BATTERY_EFF;
           if(cost_array[x].cost < price_low_allow_battery_save)      
             cost_array[x].plan = cost_array[x].plan | BATTERY_SAVE;  // if very cheep dont use battery   
           else
-          cost_array[x].plan = cost_array[x].plan | BATTERY_EXTEND; // if mid priced save constant drain on battery but supply cups of tea
+            cost_array[x].plan = cost_array[x].plan | BATTERY_EXTEND; // if mid priced save constant drain on battery but supply cups of tea
           // Serial.println("add to battery save " + String(x) +"    "+ String(cost_array[x].plan));
         }   
       }   
@@ -192,8 +193,8 @@ Serial.println("Cost  battery extend  battery save  charge");
      // an optinal log file adding a line every 30 minutes
     if((LOG_DATA&1) == 1)
         send_ss_hh_data( cost_array[now.array_now].plan,  soc,  ((float)periods_of_charge/2), stats.total_charging_cost);
-    
-    log_SD_hh_data( cost_array[now.array_now].plan,  soc,  ((float)periods_of_charge/2), stats.total_charging_cost);    
+    if((LOG_DATA&8) == 8)
+      log_SD_hh_data( cost_array[now.array_now].plan,  soc,  ((float)periods_of_charge/2), stats.total_charging_cost);    
     getTime();
  }
 
@@ -302,7 +303,7 @@ void get_tomorrows_web_data(void)
   }
 
 ////////////////////////////////////////////////////////////////////////////
-// Once a day update sum stats
+// Once a day update some stats
 // Have to do this at end of day to get total days power. But dont want the plan to change masively when i am asleep
 // therefore will use a day out of date data for plan
 //
@@ -310,20 +311,18 @@ void get_tomorrows_web_data(void)
 ////////////////////////////////////////////////////////////////////////////
 void day_update(void)
 {
-  stats.today_solar_energy = stats.tomorow_solar_energy;
   stats.yesterdays_power_use = ((stats.yesterdays_power_use * 3) + get_inverter_value(SOFAR_REG_LOADDAY))/4; // recursively avrage 
-  stats.yesterdays_outside_min_temp = stats.outside_min_temp; 
-  stats.outside_min_temp = stats.tomorow_outside_min_temp;
+
 
 // log file
  
   if((LOG_DATA&2) == 2)
   {
     getTime();
-    send_ss_day_data(stats.today_solar_energy, get_inverter_value(SOFAR_REG_PVDAY), get_inverter_value(SOFAR_REG_BATTSOC), get_inverter_value(SOFAR_REG_LOADDAY),stats.forcast_power_rec ); // log data 
+    send_ss_day_data(stats.today_solar_energy * SOLAR_PANEL_COFF, get_inverter_value(SOFAR_REG_PVDAY), get_inverter_value(SOFAR_REG_BATTSOC), get_inverter_value(SOFAR_REG_LOADDAY),stats.forcast_power_rec ); // log data 
   }
  if((LOG_DATA&4) == 4)
-    log_SD_day_data(stats.today_solar_energy, get_inverter_value(SOFAR_REG_PVDAY), get_inverter_value(SOFAR_REG_BATTSOC), get_inverter_value(SOFAR_REG_LOADDAY),stats.forcast_power_rec ); // log data 
+    log_SD_day_data(stats.today_solar_energy * SOLAR_PANEL_COFF, get_inverter_value(SOFAR_REG_PVDAY), get_inverter_value(SOFAR_REG_BATTSOC), get_inverter_value(SOFAR_REG_LOADDAY),stats.forcast_power_rec ); // log data 
       
  getTime();
 }

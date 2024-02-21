@@ -117,6 +117,8 @@ int get_web_data(String apiURL,char name)
 void do_wether_web(HTTPClient &http)
 {
   int x;
+    stats.yesterdays_outside_min_temp = stats.outside_min_temp; 
+    stats.outside_min_temp = stats.tomorow_outside_min_temp;
     String temp = getValue(http, "apparent_temperature_max", 1, 20); // get rid of first one we want the second   
     temp = getValue(http, "apparent_temperature_max", 3, 10);    
     x=temp.indexOf(',');
@@ -130,6 +132,7 @@ void do_wether_web(HTTPClient &http)
     temp = getValue(http,"sunshine_duration", 3, 15); 
     Serial.println(temp);
     x=temp.indexOf(',');
+    stats.today_solar_energy = stats.tomorow_solar_energy; // remember last value
     stats.tomorow_solar_energy = temp.substring(x+1,x+5).toInt();
    
    
@@ -262,8 +265,9 @@ void send_ss_day_data(int today_solar_energy, int pv_day, int soc, int load_day,
     {
       if (client.available())
       {
-        String line = client.readStringUntil('\n');
-        Serial.println(line);
+        client.readStringUntil('\n');
+       // String line = client.readStringUntil('\n');
+      //  Serial.println(line);
       }
     }
     client.stop();
@@ -284,7 +288,7 @@ void send_ss_hh_data(int plan, int soc, float periods_of_charge, float total_cha
 {
   char url[200];
   char buf2[300];
-  char buf3[10];
+  char buf3[100];
   
 // Google spreadsheet script ID
   char GAS_ID[]  = "AKfycbysbNjJkuHZJQxMuLO2CdK_KskSUS7fwbW116NWJLTlsLhVDq9C6Zg7YSE_4B61eFmgQQ";// v4 of 1/2 hour spreed sheet
@@ -302,7 +306,7 @@ void send_ss_hh_data(int plan, int soc, float periods_of_charge, float total_cha
 dtostrf(total_charging_cost ,4,2, buf3);
   sprintf(url,"https://script.google.com/macros/s/%s/exec?plan=%d&soc=%d&periods_of_charge=%s&total_charging_cost=%s",GAS_ID,plan, soc, buf2, buf3);
 
-  Serial.println(url);
+ // Serial.println(url);
   sprintf(buf2,"GET %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: BuildFailureDetectorESP8266\r\nConnection: close\r\n\r\n",url,host);
   client.print(buf2);
  
@@ -312,8 +316,9 @@ while (client.connected()) // once all data is read the web site will close the 
     {
       if (client.available())
       {
-        String line = client.readStringUntil('\n');
-        Serial.println(line);
+        client.readStringUntil('\n');
+       // String line = client.readStringUntil('\n');
+      //  Serial.println(line);
       }
     }
     client.stop();
@@ -323,55 +328,4 @@ while (client.connected()) // once all data is read the web site will close the 
 } 
 
 
-
-
-
-// Subroutine for sending data to Google Sheets
-// ////////////////////////////////////////////////////////////////////////////
-//
-//
-// ///////////////////////////////////////////////////////////////////////////
-void sendData(float tem, float hum, float soc) 
-{
-  char url[200];
-  char buf2[300];
-  char buf3[10];
-  char buf4[10];
-// Google spreadsheet script ID
-char GAS_ID[]  = "AKfycbyufeQCFAvoOzhuiEZw0fGEf0NNo_0-t7f5ZgHkvI1ymZ5vtVDKWg7v3h3SFcRoJMkGhQ";
-
-  Serial.print("connecting to script.google.com");  
-  //----------------------------------------Connect to Google host
-  if (!client.connect(host, httpsPort)) 
-  {
-    Serial.println("connection failed");
-    return;
-  }
- 
-
-  //----------------------------------------Processing data and sending data
-  dtostrf(tem ,4,2, buf2);
-  dtostrf(hum ,4,2, buf3);
-  dtostrf(soc ,4,2, buf4);
-  sprintf(url,"https://script.google.com/macros/s/%s/exec?solar_rad=%s&humidity=%s&soc=%s",GAS_ID,buf2,buf3,buf4);
-
-  Serial.println(url);
-  sprintf(buf2,"GET %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: BuildFailureDetectorESP8266\r\nConnection: close\r\n\r\n",url,host);
-  client.print(buf2);
- 
-
-  Serial.println("request sent");
-  //----------------------------------------
-
-  //----------------------------------------Checking whether the data was sent successfully or not
-  while (client.connected()) {
-    String line = client.readStringUntil('\n');
-    if (line == "\r") {
-      Serial.println("headers received");
-      break;
-    }
-  } 
-  Serial.print("reply was : ");
-  Serial.println(client.readStringUntil('\n'));
-} 
 
