@@ -8,8 +8,8 @@
 
 
 #define SEED_POWER_USE 3000 // W's required to add to battery/day. 
-#define TIME_URL "https://worldtimeapi.org/api/ip"
-
+//#define TIME_URL "https://worldtimeapi.org/api/ip" // stopped working november 24
+#define TIME_URL "https://tools.aimylogic.com/api/now"
 // defines used for forcast and implementation
 #define CHARGE  1
 #define BATTERY_SAVE (1<<1) // flag to say save whats in the battery and use mains power
@@ -91,19 +91,6 @@
 #define HUMAN_DISCHARGING	"Normal1"
 #endif
 
-#define DS3231_I2C_ADDRESS          0x68   ///< I2C ADDRESS
-
-#define DS3231_SEC          0x00   ///< RTC Seconds Register
-#define DS3231_MIN          0x01   ///< RTC Minutes Register
-#define DS3231_HOUR         0x02   ///< RTC Hours Register
-#define DS3231_DAY          0x03   ///< RTC Day Register
-#define DS3231_DATE         0x04   ///< RTC Date Register
-#define DS3231_MONTH        0x05   ///< RTC Month/Century Register
-#define DS3231_YEAR         0x06   ///< RTC Year Register
-#define DS323X_REG_CONTROL          0x0E   ///< Control Register
-#define DS323X_REG_STATUS           0x0F   ///< Status Register
-#define DS323X_REG_AGE_OFFSET       0x10   ///< Aging Offset Register
-#define DS3231_TEMPERATURE      0x11   ///< temperature Register
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -133,7 +120,7 @@
 #define TFT_RESET 12
 #define TFT_LIGHT 21
 
-#define RED_LED GPIO17 //io17  4 is wrong
+#define RELAY_W 16 // was red LED W for white whire and water
 #define RELAY_PIN 17 //was blue led
 //#define BBLUE_LED 17
 //4 pin connector 1=io21 2=io22 3 =1o35 4=GND // 35 input only

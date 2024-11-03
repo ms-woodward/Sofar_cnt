@@ -64,7 +64,7 @@ void updateOLED(const char *line1, const char* line2, const char *line3, const c
 	}
 
  tft.setTextSize(2);	
-	tft.setCursor(0,10);
+	tft.setCursor(0,11);
 	if(line2 != NULL)
 	{
     if(strlen(line2) > 13)
@@ -95,7 +95,7 @@ void updateOLED(const char *line1, const char* line2, const char *line3, const c
 
 
 
-
+#define scaily -2.6
 // ////////////////////////////////////////////////////////////////////////////
 // draw a bar chart of cast data starting at x and y
 //
@@ -105,8 +105,8 @@ void draw_grath(int x, int y)
   int8_t s;
   int colour;
   //char buf[8];
-
-  tft.fillRect(0, y-120, ILI9341_TFTHEIGHT, y, ILI9341_BLACK); // clear aria
+  
+  tft.fillRect(0, y-150, ILI9341_TFTHEIGHT, y, ILI9341_BLACK); // clear aria
   for(s=0;s<71; s++)
   {
     switch(cost_array[s].plan & 0xF)
@@ -118,24 +118,24 @@ void draw_grath(int x, int y)
       default : colour = ILI9341_WHITE;                         break;
     }
     
-    tft.drawFastVLine(x+((70-s)*4), y, cost_array[s].cost*-2, colour);
-    tft.drawFastVLine(x+1+((70-s)*4), y, cost_array[s].cost*-2, colour);
-    tft.drawFastVLine(x+2+((70-s)*4), y, cost_array[s].cost*-2, colour);
+    tft.drawFastVLine(x+((70-s)*4), y, cost_array[s].cost*scaily+1, colour);
+    tft.drawFastVLine(x+1+((70-s)*4), y, cost_array[s].cost*scaily, colour);
+    tft.drawFastVLine(x+2+((70-s)*4), y, cost_array[s].cost*scaily-1, colour);
   }
    tft.drawFastVLine(x+((70-now.array_now)*4), y-100, 110, ILI9341_PINK); // mark current time
    tft.setTextSize(1);
    tft.setTextColor(ILI9341_PINK,ILI9341_BLACK); 
    tft.setCursor(x+((70-now.array_now)*4)-10,y+10);
    tft.println("now");
-   tft.drawFastHLine(0,(y-cost_array[now.array_now].cost*2), 260, ILI9341_PINK); // mark current price
-   tft.setCursor(x-20,y-(cost_array[now.array_now].cost*2)-3);
+   tft.drawFastHLine(0,(y+cost_array[now.array_now].cost*scaily), 260, ILI9341_PINK); // mark current price
+   tft.setCursor(x-20,y-(-cost_array[now.array_now].cost*scaily)-3);
    
   //sprintf(buf,"%fp",cost_array[now.array_now].cost);
   tft.print(cost_array[now.array_now].cost);
 
-  tft.setCursor(x-20,y-(stats.cheapest*2)+12);
+  tft.setCursor(x-20,y-(-stats.cheapest*scaily)+12);
   tft.print(stats.cheapest);
- tft.setCursor(x-20,y-(stats.max_cost*2)-5);
+ tft.setCursor(x-20,y-(-stats.max_cost*scaily)-5);
   tft.print(stats.max_cost);
 
   tft.setCursor(x+30,y+20);

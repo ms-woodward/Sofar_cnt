@@ -142,17 +142,16 @@ void do_wether_web(HTTPClient &http)
  
 
 
-
+//{"timezone":"UTC","formatted":"03.11.2024 11:09","timestamp":1730632166223,"weekDay":7,"day":3,"month":11,"year":2024,"hour":11,"minute":9}
 void  do_time_web(HTTPClient &http)
 {
-    String temp = getValue(http, "datetime", 1, 23);  // gets data 10 char    
+    String temp = getValue(http, "formatted", 3, 23);  // gets data 10 char  
+      Serial.println("Get time from web ");  
           Serial.println(temp);  
-//          setClk(DS3231_YEAR ,temp.substring(2,6).toInt());
- //         setClk(DS3231_MONTH ,temp.substring(7,9).toInt());
-          now.date = temp.substring(10,12).toInt();           
-          now.hour = temp.substring(13,15).toInt(); 
-          now.min = temp.substring(16,18).toInt(); 
-          now.sec = temp.substring(19,21).toInt(); 
+          now.date = temp.substring(0,2).toInt();           
+          now.hour = temp.substring(11,13).toInt(); 
+          now.min = temp.substring(14,16).toInt(); 
+          now.sec = 0;// temp.substring(19,21).toInt(); 
           // counter has to be syncronised to seconds 
         //  timerWrite(clk_timer, now.sec * 1000000 ); //set Hw counter to nearest second appears to get stuck as reset value
           get_time_offset_in_sec = (timerRead(clk_timer)/1000000) - now.sec; // to provent minute incromenting on next get_time call        

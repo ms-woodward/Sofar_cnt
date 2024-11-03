@@ -92,14 +92,15 @@ extern float BATTERY_EFF;
   while(periods_of_charge < req_periods_to_charge                                               // we nead it
           || (PRICE_LOW_INCREASE_CHARGING_TIME > cost_array[y].cost && stats.resulting_soc < 60 ) // its cheep
           || ((PRICE_LOW_INCREASE_CHARGING_TIME/2) > cost_array[y].cost && stats.resulting_soc < 80 ) 
-          || (0.1 > cost_array[y].cost && stats.resulting_soc < 99 ))                            // its free
+          //|| (0.1 > cost_array[y].cost && stats.resulting_soc < 99 ))                            // its free
+          || (0.1 > cost_array[y].cost ))                            // its free
   {
     n++;
      Serial.println("while loop ran *****************************");
     if(n > 40)
       break; // escape if conditions are imposible
     cheap = 200;
-    for(x=9;x<now.array_now+1;x++)
+    for(x=7;x<=now.array_now;x++)
     {   
       if(cost_array[x].cost < cheap && ((cost_array[x].plan & 0xF) & CHARGE) == 0)
         {
@@ -264,8 +265,9 @@ int calc_power_required(void) // assumes no sun
     else // hope for sunsine or use less!
        req_power = (BATTERY_SIZE - available_power)*0.8; // charge to 80%
    }
-     dtostrf(((float)stats.estemated_solar_power)/1000,4,2, buf2);
-    sprintf(buf,"Solar forcast %sKWh   ",buf2);
+
+     dtostrf(((float)stats.estemated_solar_power)/1000,3,1, buf2);
+    sprintf(buf,"SolarForcast %sKWh %d%%",buf2,(int)((((float)stats.estemated_solar_power * (BATTERY_EFF/100.0))/BATTERY_SIZE)*100));
     update_plan_screen(NULL,buf ,NULL,NULL,NULL,NULL);
     
     sprintf(buf,"Power required %dW  ",req_power);

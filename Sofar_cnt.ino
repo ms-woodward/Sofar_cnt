@@ -181,10 +181,14 @@ void implement_control(void) // implement strategy when required
         } 
         
       if(cost_array[x].plan & HEAT != 0)
-        digitalWrite(RELAY_PIN, HIGH); // turn on heating and maybe hot water
+        digitalWrite(RELAY_PIN, LOW); // turn on heating and maybe hot water
       else
-        digitalWrite(RELAY_PIN, LOW); // turn off heating 
+        digitalWrite(RELAY_PIN, HIGH); // turn off heating 
 
+      if(cost_array[x].plan & HOT_WATER != 0)
+        digitalWrite(RELAY_W, LOW); // turn on hot water
+      else
+        digitalWrite(RELAY_W, HIGH); // turn off hot water 
 }
 
 
@@ -225,6 +229,7 @@ void setup_wifi()
 
 #define IS_BATTERY_EXTEND_ON  (cost_array[now.array_now].plan & (BATTERY_EXTEND)) !=0
 #define IS_BATTERY_SAVE_ON  (cost_array[now.array_now].plan & (BATTERY_SAVE)) !=0
+
 //////////////////////////////////////////////////////////////////////////////////
 // call about every 3 seconds
 // BATTERY_EXTEND_MODE: stops using the battery under light loads but still 
@@ -237,23 +242,24 @@ void batterySave()
   static int grid_power =0;
   static int bat_power =0;
   static uint8_t in_auto =0; //should be same as INVERTER_RUNNINGSTATE
+  int bat_extend_switching_power = -1*(2000 / ((int)get_inverter_value(SOFAR_REG_BATTSOC)/5)); // 500w flat battery 100w charged
   int m;
   char mode_string[] = "Undefined start up   ";
   char buf[20];
   last_run++;
-	if(last_run==BATTERYSAVE_INTERVAL && ((cost_array[now.array_now].plan & BATTERY_SAVE) !=0) || ((cost_array[now.array_now].plan & BATTERY_EXTEND) != 0))
+	if(last_run==BATTERYSAVE_INTERVAL && (IS_BATTERY_SAVE_ON || IS_BATTERY_EXTEND_ON))
 	{
     last_run =0;
     
     m = (int)get_inverter_value(SOFAR_REG_GRIDW);
 		if(m == 123456789) // its an error code
       return;
-    grid_power = m;// ((grid_power * 1) + m)/2; //recursively avrage to reduse effect of spikes  
+    grid_power = m;// - means from grid?
     
     m = (int)get_inverter_value(SOFAR_REG_BATTW);
 		if(m == 123456789) // its an error code
       return;
-    bat_power = m;//((bat_power * 1) + m)/2; //recursively avrage to reduse effect of spikes  
+    bat_power = m;// - means from battery
 
     
     //Serial.println("Monitoring Grid power: "+String(grid_power)+ "W Battery power: "+String(bat_power)+ "W State=" + String(INVERTER_RUNNINGSTATE)+" in_auto="+String(in_auto));// tempary line
@@ -262,26 +268,27 @@ void batterySave()
     {
    //  Serial.println("battery save mode on"); 
     // in auto mode    and battery is discharging
-    if(INVERTER_RUNNINGSTATE != waiting &&  bat_power < -20   && bat_power > -400    ) // - meens power from battery
+    if(INVERTER_RUNNINGSTATE != waiting &&  bat_power < -20   && bat_power > bat_extend_switching_power    ) // - meens power from battery and if  power is between  20 and "bat_extend_switching_power"
       {
         if(IS_BATTERY_EXTEND_ON)
-          strcpy(mode_string, "Bat. extend  ");
+          strcpy(mode_string, "Bat Extend sw");
         else
-          strcpy(mode_string, "Battery save ");
+          strcpy(mode_string, "Bat. Save sw ");
       if(!sendPassiveCmd(SOFAR_SLAVE_ID, SOFAR_FN_STANDBY, SOFAR_PARAM_STANDBY, &mode_string[0])) // this makes the battery do nothing
         {
           in_auto = 0;
-        //  Serial.println("Grid power: "+String(grid_power)+ "W Battery power: "+String(bat_power)+ "W so switched to standby");
+          Serial.println("Grid power: "+String(grid_power)+ "W Battery power: "+String(bat_power)+ "W so switched to standby");
           last_run = -6; // allows time for change before retesting
         }
       }
+
     // power is flowing to the grid and in standby better go to auto and charge battery	
-    if((INVERTER_RUNNINGSTATE == waiting && (grid_power > 20))  || (IS_BATTERY_EXTEND_ON && grid_power < -400    ))
+    if((INVERTER_RUNNINGSTATE == waiting && (grid_power > 20))  || (IS_BATTERY_EXTEND_ON && grid_power < bat_extend_switching_power-20    )) //will make it charge battery when posible and supply load over 200w
       {
-      if(!sendPassiveCmd(SOFAR_SLAVE_ID, SOFAR_FN_AUTO, 0, "bsave_auto   "))  // this can import and export 
+      if(!sendPassiveCmd(SOFAR_SLAVE_ID, SOFAR_FN_AUTO, 0, "Bat save auto"))  // this can import and export 
         {
         in_auto = 1;
-      //  Serial.println("Grid power: "+String(grid_power)+ "W Battery power: "+String(bat_power)+ "W so switched to auto");
+        Serial.println("Grid power: "+String(grid_power)+ "W Battery power: "+String(bat_power)+ "W so switched to auto");
         last_run = -6; // allows time for change before retesting checked every 6 seconds normaly 36 seconds after change
         } 
       }
@@ -478,11 +485,15 @@ void setup()
 	Serial.begin(9600);
   Serial.println("1 Serial start");  
   Serial2.begin(9600,SERIAL_8N1,RXPin,TXPin); // for RS422
-	pinMode(LED_BUILTIN, OUTPUT);  
+	//pinMode(LED_BUILTIN, OUTPUT);  
   pinMode(TFT_LIGHT, OUTPUT);  
   pinMode(RELAY_PIN, OUTPUT);   
+  pinMode(RELAY_W, OUTPUT);   
+  
+  digitalWrite(RELAY_W, HIGH); // white wire water heat relay
+  //digitalWrite(LED_BUILTIN, LOW); 
   digitalWrite(TFT_LIGHT, LOW);
-  digitalWrite(RELAY_PIN, LOW);
+  digitalWrite(RELAY_PIN, HIGH); // blue wire high= off heating ??
 
  // Serial.print("original CPU speed "); 
  // Serial.println(getCpuFrequencyMhz()); 
@@ -495,7 +506,6 @@ void setup()
   stats.outside_min_temp = 15;
   stats.resulting_soc = 50;
 
-	//delay(500);
 
 	//Turn on the screen
 	tft.begin();  // initialise screen  
@@ -556,7 +566,7 @@ void loop()
   int l,soc;
   int8_t up_down=0;
   char buf[30];
-  char wifi_buf[30];
+ // char wifi_buf[30];
   static uint8_t next_adj_time = 30;
   static int wifi_status = -1;
   getTime();
@@ -572,6 +582,7 @@ void loop()
 
 if(now.min == next_adj_time) // do on the hour and 1/2 hour
 {
+   Serial.println("halfe houre check"); 
   if(next_adj_time == 30)
     next_adj_time = 0;
   else
@@ -594,8 +605,8 @@ if(now.min == next_adj_time) // do on the hour and 1/2 hour
   update_plan_screen(&buf[0],NULL,NULL,NULL,NULL,NULL);
   sprintf(buf,"%02d:%02d:%02d  ",now.hour,now.min,now.sec);
 //  Serial.println(buf); 
-  updateOLED(buf, wifi_buf, NULL, NULL);
-
+  updateOLED(buf, NULL, NULL, NULL);
+//sendPassiveCmd(SOFAR_SLAVE_ID, SOFAR_FN_CHARGE, 	MAX_POWER, "Charging ");
  //digitalWrite(RELAY_PIN, LOW); 
 // delay(4000);
  // digitalWrite(RELAY_PIN, HIGH); 
