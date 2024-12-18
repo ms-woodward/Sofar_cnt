@@ -40,8 +40,8 @@ extern float BATTERY_EFF;
   int periods_of_charge=0; // haw many 1/2 hour periods we currently have
   int req_periods_to_charge =0; // how many 1/2 hours are we charging for
   int soc;
-  
-  
+   tft.fillScreen(ILI9341_BLACK); // clear whole screen as grath can run of top at times
+   print_OLED(XP,YP,"Plan       ");
   if((now.hour >  17 &&  now.date + 1 != cost_array[3].date) || cost_array[0].cost == 125)
     get_tomorrows_web_data(); // get octupuse price and forcast data also updates power required.
    
@@ -178,17 +178,11 @@ Serial.println("Cost  battery extend  battery save  charge");
       sprintf(buf,"%02d:%02d,   %f, %x ",cost_array[x].hour,cost_array[x].min,cost_array[x].cost,cost_array[x].plan);    
       Serial.println(buf);  
     }
-    draw_grath(20,200);
+    draw_grath(25,200);
      
-
-
-
     //sprintf(buf,"Cost %sp for %sh   ",buf2,buf3);  
    
  //sprintf(buf2,"Charging to %d%% SOC ",stats.resulting_soc);
-
-
-
     
     getTime(); // refresh as log file can take a long time
      // an optinal log file adding a line every 30 minutes
@@ -276,9 +270,9 @@ int calc_power_required(void) // assumes no sun
       return 0; // we have anothe stored no nead to charge
    req_time = (req_power*2/MAX_POWER); // in 1/2 hours
 
- return (int)(req_time);
+ //return (int)(req_time);
    
- //  return (int)(req_time-0.1)+1; // generaly round up unless its .1 or less  
+   return (int)(req_time-0.1)+1; // generaly round up unless its .1 or less  
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

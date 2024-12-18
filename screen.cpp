@@ -52,6 +52,19 @@ void update_plan_screen(char *line1, char* line2, char *line3, char *line4, char
 //
 //
 //////////////////////////////////////////////////////////////////////////////////////////
+void print_OLED(uint8_t x,uint8_t y,const char *line1)
+{
+  tft.setCursor(x, y);
+  tft.setTextColor(ILI9341_WHITE,ILI9341_BLACK);  
+  tft.setTextSize(1);	
+	tft.println(line1);
+}
+  
+
+////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+//////////////////////////////////////////////////////////////////////////////////////////
 void updateOLED(const char *line1, const char* line2, const char *line3, const char *line4)
 {
   tft.setCursor(0, 0);
@@ -106,7 +119,7 @@ void draw_grath(int x, int y)
   int colour;
   //char buf[8];
   
-  tft.fillRect(0, y-150, ILI9341_TFTHEIGHT, y, ILI9341_BLACK); // clear aria
+  tft.fillRect(0, y-140, ILI9341_TFTHEIGHT, y, ILI9341_BLACK); // clear aria
   for(s=0;s<71; s++)
   {
     switch(cost_array[s].plan & 0xF)
@@ -157,6 +170,9 @@ int8_t do_buttons(void)
   int8_t up_down =0;
   Adafruit_GFX_Button button_d;
   Adafruit_GFX_Button button_i;
+Adafruit_GFX_Button button_charge;
+  Adafruit_GFX_Button button_bat_save;
+  
   TS_Point tuched;
   tft.setCursor(15, 80);
   tft.setTextColor(ILI9341_WHITE,ILI9341_BLACK);  
@@ -164,8 +180,15 @@ int8_t do_buttons(void)
   tft.print("Change Power to be stored");
   button_d.initButtonUL(&tft, 30, 100, 100,45 , ILI9341_GREEN, ILI9341_LIGHTGREY,ILI9341_BLACK, "Reduse", 2);
   button_d.drawButton(true); 
+
   button_i.initButtonUL(&tft, 200, 100, 100,45 , ILI9341_GREEN, ILI9341_LIGHTGREY,ILI9341_BLACK, "Increse", 2);
   button_i.drawButton(true); 
+
+button_bat_save.initButtonUL(&tft, 30, 180, 100,45 , ILI9341_GREEN, ILI9341_LIGHTGREY,ILI9341_BLACK, "Bat Save", 2);
+  button_bat_save.drawButton(true); 
+
+button_charge.initButtonUL(&tft, 200, 180, 100,45 , ILI9341_GREEN, ILI9341_LIGHTGREY,ILI9341_BLACK, "Charge", 2);
+  button_charge.drawButton(true); 
 
 while(!ts.bufferEmpty())
   {
@@ -197,38 +220,56 @@ for(l=0;l<27000;l++) // a time out if nothing is pressed
     Serial.println();
 
   if (button_d.contains(x,y) && tuched.z > 100 )
-    button_d.press(true);  // tell the button it is pressed
-  else 
-    button_d.press(false); 
+  {
+  //  button_d.press(true);  // tell the button it is pressed
+  //else 
+  //  button_d.press(false); 
   
-  if(button_d.justPressed())
+  //if(button_d.justPressed())
     button_d.drawButton(false);
 
-  if(button_d.justReleased())
-    {   
+  //if(button_d.justReleased())
+  //  {   
     up_down = -1;
     Serial.print("*******************decrese button detected*********** ");
-    break;
+   // break;
     }
 
   if (button_i.contains(x,y) && tuched.z > 100)
-    button_i.press(true);  // tell the button it is pressed
-  else 
-    button_i.press(false); 
-
-  if(button_i.justPressed())
-    button_i.drawButton(false);
-
-  if(button_i.justReleased())
     {
-      up_down = 1;
-      Serial.print("increse button detected*** ");
-      break;// add stuff here ti reduse power
+  //  button_i.press(true);  // tell the button it is pressed
+    up_down = 1;
+    button_i.drawButton(false);
+    Serial.print("increse button detected*** ");
     }  
+
+if (button_bat_save.contains(x,y) && tuched.z > 100)
+  {
+    button_bat_save.drawButton(false);
+     Serial.println("*** Battey save button detected *** ");
+    up_down = 20;
+    button_bat_save.drawButton(false);
+  }  
+
+
+  if (button_charge.contains(x,y) && tuched.z > 100 )
+    {
+    button_charge.drawButton(false);  
+    up_down = 10;
+    Serial.print("******************* charge button detected*********** ");  
+    } 
+
   delay(50);  
+  if(up_down != 0 && tuched.z < 10) // selection made and finger removed
+  {
+    Serial.print("Selection done =  ");
+    Serial.println(up_down); 
+   // draw_grath(25,200);// redraw normal screen
+    return up_down;
+  }
+   
 }
-Serial.print("Selection done =  ");
-Serial.println(up_down); 
+
  return up_down;
 }
 

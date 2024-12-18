@@ -151,7 +151,7 @@ void  do_time_web(HTTPClient &http)
           now.date = temp.substring(0,2).toInt();           
           now.hour = temp.substring(11,13).toInt(); 
           now.min = temp.substring(14,16).toInt(); 
-          now.sec = 0;// temp.substring(19,21).toInt(); 
+          now.sec = 30;// temp.substring(19,21).toInt(); 
           // counter has to be syncronised to seconds 
         //  timerWrite(clk_timer, now.sec * 1000000 ); //set Hw counter to nearest second appears to get stuck as reset value
           get_time_offset_in_sec = (timerRead(clk_timer)/1000000) - now.sec; // to provent minute incromenting on next get_time call        

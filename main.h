@@ -90,7 +90,9 @@
 #define HUMAN_CHARGING		"Normal"
 #define HUMAN_DISCHARGING	"Normal1"
 #endif
-
+// location of test on screan that reports current program location
+#define XP 2
+#define YP 230
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -238,5 +240,6 @@ void send_ss_day_data(int today_solar_energy, int pv_day, int soc, int load_day,
 void log_SD_day_data(int today_solar_energy, int pv_day, int soc, int load_day, int forcast_power_rec );
 void log_SD_hh_data(int plan, int soc, float periods_of_charge, float total_charging_cost);
 int8_t do_buttons(void);
+void print_OLED(uint8_t x,uint8_t y,const char *line1);
 void read_settings_file( const char * path);
 #endif

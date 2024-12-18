@@ -16,7 +16,7 @@ char OCTOPUS_URL[180];
 char WETHER_URL[200];
 int PRICE_LOW_ALLOW_BATTERY_EXTEND =15;
 int PRICE_LOW_ALLOW_BATTERY_SAVE =10;
-int PRICE_LOW_INCREASE_CHARGING_TIME=9;
+int PRICE_LOW_INCREASE_CHARGING_TIME=10;
 int TEMPERATURE_COMPENSATION=220;
 float SOLAR_PANEL_COFF= 0.8;
 float BATTERY_SIZE = 11900.0;
@@ -159,15 +159,15 @@ void implement_control(void) // implement strategy when required
   uint8_t x = now.array_now; // was found when planing happens every 1/2 hour
   uint loop=0;
   char buf[100];
-//cost_array[x].plan = 1;
-      sprintf(buf,"Implementing settings Plan %X x=%d",cost_array[x].plan & 0xF,x);
-      Serial.println(buf);
+  print_OLED(XP,YP,"Implement C");
+  sprintf(buf,"Implementing settings Plan %X x=%d",cost_array[x].plan & 0xF,x);
+  Serial.println(buf);
 
       if(cost_array[x].plan & CHARGE != 0)
         {
           do{
             sendPassiveCmd(SOFAR_SLAVE_ID, SOFAR_FN_CHARGE, 	MAX_POWER, "Charging ");
-            tdelay(3000);
+            tdelay(1000);
             loop++;
           }while(INVERTER_RUNNINGSTATE != charging && loop < 16); //2
         }
@@ -175,7 +175,7 @@ void implement_control(void) // implement strategy when required
         {
           do{
               sendPassiveCmd(SOFAR_SLAVE_ID, SOFAR_FN_AUTO, 0, "Auto      "); 
-              tdelay(3000);
+              tdelay(1000);
               loop++;
             }while(INVERTER_RUNNINGSTATE != waiting && loop < 16); //2
         } 
@@ -245,31 +245,46 @@ void batterySave()
   int bat_extend_switching_power = -1*(2000 / ((int)get_inverter_value(SOFAR_REG_BATTSOC)/5)); // 500w flat battery 100w charged
   int m;
   char mode_string[] = "Undefined start up   ";
-  char buf[20];
-  last_run++;
-	if(last_run==BATTERYSAVE_INTERVAL && (IS_BATTERY_SAVE_ON || IS_BATTERY_EXTEND_ON))
+  uint8_t errors = 0;
+  if(last_run < 5)
+    last_run++;
+    char buf[10];
+
+    //  sprintf(buf,"bat save last run = %d is battery save on=%d",last_run,IS_BATTERY_SAVE_ON);
+    //  Serial.println(buf);
+	if((last_run > BATTERYSAVE_INTERVAL) && (IS_BATTERY_SAVE_ON || IS_BATTERY_EXTEND_ON))
 	{
     last_run =0;
-    
-    m = (int)get_inverter_value(SOFAR_REG_GRIDW);
-		if(m == 123456789) // its an error code
-      return;
+    print_OLED(XP,YP,"Bat save   ");
+    do
+    {
+      m = (int)get_inverter_value(SOFAR_REG_GRIDW);	 
+      errors++;
+      if(errors > 100)
+        return;
+    }while(m == 123456789);// its an error code
     grid_power = m;// - means from grid?
-    
-    m = (int)get_inverter_value(SOFAR_REG_BATTW);
-		if(m == 123456789) // its an error code
-      return;
+    errors = 0;
+    do{
+      m = (int)get_inverter_value(SOFAR_REG_BATTW);
+		  errors++;
+      if(errors > 100)
+        return;
+    }while(m == 123456789);// its an error code
     bat_power = m;// - means from battery
 
     
-    //Serial.println("Monitoring Grid power: "+String(grid_power)+ "W Battery power: "+String(bat_power)+ "W State=" + String(INVERTER_RUNNINGSTATE)+" in_auto="+String(in_auto));// tempary line
+    Serial.println("Monitoring Grid power: "+String(grid_power)+ "W Battery power: "+String(bat_power)+ "W State=" + String(INVERTER_RUNNINGSTATE)+" in_auto="+String(in_auto));// tempary line
   
   
     {
-   //  Serial.println("battery save mode on"); 
+  //  Serial.println("battery save mode on"); 
     // in auto mode    and battery is discharging
-    if(INVERTER_RUNNINGSTATE != waiting &&  bat_power < -20   && bat_power > bat_extend_switching_power    ) // - meens power from battery and if  power is between  20 and "bat_extend_switching_power"
+
+    if((INVERTER_RUNNINGSTATE != waiting) && ( bat_power < -20 ) )// && ( bat_power > bat_extend_switching_power )) // - meens power from battery and if  power is between  20 and "bat_extend_switching_power"
       {
+        if(IS_BATTERY_EXTEND_ON  && !( bat_power > bat_extend_switching_power ) )
+          return;  // dont meat all conditions for batery extend
         if(IS_BATTERY_EXTEND_ON)
           strcpy(mode_string, "Bat Extend sw");
         else
@@ -303,10 +318,12 @@ void batterySave()
 void heartbeat()
 {
 	static unsigned long  lastRun = 0;
-  lastRun++;
+  if(lastRun < 20)
+    lastRun++;
 	//Send a heartbeat
-	if(lastRun == HEARTBEAT_INTERVAL)
+	if(lastRun > HEARTBEAT_INTERVAL)
 	{
+     print_OLED(XP,YP,"Hartbeat   ");
     lastRun =0;
 		uint8_t	sendHeartbeat[] = {SOFAR_SLAVE_ID, 0x49, 0x22, 0x01, 0x22, 0x02, 0x00, 0x00};
 		int	ret;
@@ -322,10 +339,7 @@ void heartbeat()
 			updateOLED(NULL, NULL, "RS485        ", "ERROR        ");
 		}
 
-		//Flash the LED
-		//digitalWrite(LED_BUILTIN, LOW);
-		//delay(4);
-		//digitalWrite(LED_BUILTIN, HIGH);
+		
 	}
 }
 
@@ -338,10 +352,12 @@ void updateRunstate()
 	static unsigned long	lastRun = 0;
   char buf[21];
   char buf_grid[21];
+  if(lastRun < 20)
   lastRun++;
 	//Check the runstate
-	if(lastRun == RUNSTATE_INTERVAL)
+	if(lastRun > RUNSTATE_INTERVAL)
 	{
+     print_OLED(XP,YP,"Run state  ");
     lastRun = 0;
 		modbusResponse  response;
 #ifdef DEBUG
@@ -566,7 +582,6 @@ void loop()
   int l,soc;
   int8_t up_down=0;
   char buf[30];
- // char wifi_buf[30];
   static uint8_t next_adj_time = 30;
   static int wifi_status = -1;
   getTime();
@@ -582,7 +597,7 @@ void loop()
 
 if(now.min == next_adj_time) // do on the hour and 1/2 hour
 {
-   Serial.println("halfe houre check"); 
+   Serial.println("half houre check"); 
   if(next_adj_time == 30)
     next_adj_time = 0;
   else
@@ -591,15 +606,7 @@ if(now.min == next_adj_time) // do on the hour and 1/2 hour
   implement_control(); // implement strategy when required
 }
 
- /*if(wifi_status != WiFi.status()) // state has changed
-  {
-    wifi_status = WiFi.status();  
-    if(WiFi.status() != WL_CONNECTED) 
-      strcpy(wifi_buf,"Offline      ");
-    else
-      strcpy(wifi_buf,"Online       ");
-  } */
-  
+ 
   soc = (int)get_inverter_value(SOFAR_REG_BATTSOC) ; 
   sprintf(buf,"SOC %3d     ",soc);
   update_plan_screen(&buf[0],NULL,NULL,NULL,NULL,NULL);
@@ -613,22 +620,54 @@ if(now.min == next_adj_time) // do on the hour and 1/2 hour
 //log_SD_hh_data(2, 4, 3.6, 0.5);
 
   // check if user tuched the screen
-  for(l=0;l<100;l++)
-  {
+   print_OLED(XP,YP,"Tuch screen");
+ for(l=0;l<45;l++)
+ {
      delay(10); 
     if (ts.touched()) 
       {   
       up_down = do_buttons(); // returns -1 for reduse +1 for increse  and 0 if not on button
+    switch(up_down)
+    {
+      case -1 :
+      case 1 :
+        stats.forcast_power_rec = stats.yesterdays_power_use = stats.forcast_power_rec + (up_down * 1500);
+        sprintf(buf," new power required = %02d \n ",stats.forcast_power_rec);
+        Serial.println(buf); 
+        plan_control(); // re run strategy to work out what to do as user changed power requirment
+        implement_control(); // implement strategy when required         
+       break;
+
+        case 10: //charge
+              if(next_adj_time == 30) // this will allow the set state to auto cansel in 30 to 60 minutes time
+                next_adj_time = 0;
+              else
+                next_adj_time =30;
+              cost_array[now.array_now].plan = CHARGE;
+              cost_array[now.array_now-1].plan = CHARGE; 
+              implement_control(); // implement strategy when required  
+              draw_grath(20,200);   
+              break;
+
+        case 20: //battery save
+              if(next_adj_time == 30) // this will allow the set state to auto cansel in 30 to 60 minutes time
+                next_adj_time = 0;
+              else
+                next_adj_time =30;
+              cost_array[now.array_now].plan = BATTERY_SAVE;
+              cost_array[now.array_now-1].plan = BATTERY_SAVE; 
+              implement_control(); // implement strategy when required 
+              draw_grath(20,200);    
+              break;
+
+
+        default : break;
+      }
+
       Serial.print("User changing power req = "); 
       Serial.println(up_down); 
-      if(up_down !=0)
-        {
-        stats.forcast_power_rec = stats.yesterdays_power_use = stats.forcast_power_rec + (up_down * (BATTERY_SIZE/MAX_POWER/2));
-        plan_control(); // re run strategy to work out what to do as user changed power requirment
-        implement_control(); // implement strategy when required   
-        }
-      else
-        draw_grath(20,200);  
+      
+        
     } 
   }
 }
