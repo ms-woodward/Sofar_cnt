@@ -6,7 +6,7 @@
 // The device name is used as the name displayed oy the wify hub.
 const char* deviceName = "Sofar_cnt";
 const char* version = "v1.0.0";
-
+static int8_t switch_state=0;
 
 // following are constants loaded from file
 uint8_t LOG_DATA =2; // flags to say if data should be logged
@@ -78,7 +78,7 @@ XPT2046_Touchscreen ts(XPT2046_CS, XPT2046_IRQ);
 
 unsigned int INVERTER_RUNNINGSTATE;
 
-Octopuss cost_array[71]; // store all cost data for next day or 2
+Octopuss cost_array[72]; // store all cost data for next day or 2
 
 Stats stats;
 
@@ -152,18 +152,19 @@ Bit 3 - Battery flat, discharge prohibited
 */
 ///////////////////////////////////////////////////////////////////////////////
 //
-//
+// now.array_now can be 70 if the data download has failed so use this to limit damage
 ///////////////////////////////////////////////////////////////////////////////
 void implement_control(void) // implement strategy when required
 {
   uint8_t x = now.array_now; // was found when planing happens every 1/2 hour
   uint loop=0;
   char buf[100];
-  print_OLED(XP,YP,"Implement C");
+  print_OLED(XP,YP,"Implement C ");
   sprintf(buf,"Implementing settings Plan %X x=%d",cost_array[x].plan & 0xF,x);
   Serial.println(buf);
-
-      if(cost_array[x].plan & CHARGE != 0)
+  if(x == 70)
+    print_OLED(XP,YP,"TIME ERROR Going to safe auto mode");
+      if(cost_array[x].plan & CHARGE != 0 && x != 70) // if x>60 its broken so go to auto mode to limit damage
         {
           do{
             sendPassiveCmd(SOFAR_SLAVE_ID, SOFAR_FN_CHARGE, 	MAX_POWER, "Charging ");
@@ -180,12 +181,12 @@ void implement_control(void) // implement strategy when required
             }while(INVERTER_RUNNINGSTATE != waiting && loop < 16); //2
         } 
         
-      if(cost_array[x].plan & HEAT != 0)
+      if(cost_array[x].plan & HEAT != 0 && x != 70)
         digitalWrite(RELAY_PIN, LOW); // turn on heating and maybe hot water
       else
         digitalWrite(RELAY_PIN, HIGH); // turn off heating 
 
-      if(cost_array[x].plan & HOT_WATER != 0)
+      if(cost_array[x].plan & HOT_WATER != 0 && x != 70)
         digitalWrite(RELAY_W, LOW); // turn on hot water
       else
         digitalWrite(RELAY_W, HIGH); // turn off hot water 
@@ -236,7 +237,7 @@ void setup_wifi()
 //                      supplies hevy loads from the battery and allowes charging.
 // BATTERYSAVE: stops using the battery but allowes charging.
 //////////////////////////////////////////////////////////////////////////////////
-void batterySave()
+void batterySave(uint8_t auto_overide)
 {
 	static int8_t	last_run = 0;
   static int grid_power =0;
@@ -252,6 +253,14 @@ void batterySave()
 
     //  sprintf(buf,"bat save last run = %d is battery save on=%d",last_run,IS_BATTERY_SAVE_ON);
     //  Serial.println(buf);
+  if(last_run > BATTERYSAVE_INTERVAL && auto_overide == 5) // user off button pressed so go auto alweays
+  {
+     last_run =0;
+    sendPassiveCmd(SOFAR_SLAVE_ID, SOFAR_FN_AUTO, 0, "Switched Off ");
+    print_OLED(XP,YP,"Bat save AUT");
+    return;
+  }
+
 	if((last_run > BATTERYSAVE_INTERVAL) && (IS_BATTERY_SAVE_ON || IS_BATTERY_EXTEND_ON))
 	{
     last_run =0;
@@ -323,7 +332,7 @@ void heartbeat()
 	//Send a heartbeat
 	if(lastRun > HEARTBEAT_INTERVAL)
 	{
-     print_OLED(XP,YP,"Hartbeat   ");
+     print_OLED(XP,YP,"Hartbeat    ");
     lastRun =0;
 		uint8_t	sendHeartbeat[] = {SOFAR_SLAVE_ID, 0x49, 0x22, 0x01, 0x22, 0x02, 0x00, 0x00};
 		int	ret;
@@ -357,7 +366,7 @@ void updateRunstate()
 	//Check the runstate
 	if(lastRun > RUNSTATE_INTERVAL)
 	{
-     print_OLED(XP,YP,"Run state  ");
+     print_OLED(XP,YP,"Run state   ");
     lastRun = 0;
 		modbusResponse  response;
 #ifdef DEBUG
@@ -375,14 +384,16 @@ void updateRunstate()
 			switch(INVERTER_RUNNINGSTATE)
 			{
 				case waiting:
-					if(IS_BATTERY_EXTEND_ON)
+					if(IS_BATTERY_EXTEND_ON && switch_state != 5)
           {
 						updateOLED(NULL, NULL, "Bat. Extend  ", buf_grid);
           }
-					else if(IS_BATTERY_SAVE_ON)
+					else if(IS_BATTERY_SAVE_ON && switch_state != 5)
           {
 						updateOLED(NULL, NULL, "Battery Save ", buf_grid);
           }
+          else if(switch_state == 5)
+            updateOLED(NULL, NULL, "Switched Off ", buf_grid);
           else
           {
 						updateOLED(NULL, NULL, "Standby      ", "             ");
@@ -580,7 +591,7 @@ void setup()
 void loop()
 {
   int l,soc;
-  int8_t up_down=0;
+  
   char buf[30];
   static uint8_t next_adj_time = 30;
   static int wifi_status = -1;
@@ -593,10 +604,11 @@ void loop()
 	updateRunstate();
 
 	//Set battery save state
-	batterySave();
+	batterySave(switch_state); 
 
 if(now.min == next_adj_time) // do on the hour and 1/2 hour
 {
+  switch_state =0; //cansel any switch states like "off"
    Serial.println("half houre check"); 
   if(next_adj_time == 30)
     next_adj_time = 0;
@@ -620,29 +632,39 @@ if(now.min == next_adj_time) // do on the hour and 1/2 hour
 //log_SD_hh_data(2, 4, 3.6, 0.5);
 
   // check if user tuched the screen
-   print_OLED(XP,YP,"Tuch screen");
+   print_OLED(XP,YP,"Tuch screen ");
  for(l=0;l<45;l++)
  {
      delay(10); 
     if (ts.touched()) 
       {   
-      up_down = do_buttons(); // returns -1 for reduse +1 for increse  and 0 if not on button
-    switch(up_down)
+    switch_state = do_buttons(); // returns -1 for reduse +1 for increse  and 0 if not on button
+    switch(switch_state)
     {
       case -1 :
       case 1 :
-        stats.forcast_power_rec = stats.yesterdays_power_use = stats.forcast_power_rec + (up_down * 1500);
+        stats.forcast_power_rec = stats.yesterdays_power_use = stats.forcast_power_rec + (switch_state * 1500);
         sprintf(buf," new power required = %02d \n ",stats.forcast_power_rec);
         Serial.println(buf); 
         plan_control(); // re run strategy to work out what to do as user changed power requirment
         implement_control(); // implement strategy when required         
        break;
 
+      case 5: // off button
+          if(next_adj_time == 30) // this will allow the set state to auto cansel in 30 to 60 minutes time
+                next_adj_time = 0;
+          else
+                next_adj_time =30;
+        plan_control(); // re run strategy to work out what to do as user changed power requirment
+        implement_control(); // implement strategy when required     
+        //  draw_grath(20,200); // remove buttons
+      break;
         case 10: //charge
               if(next_adj_time == 30) // this will allow the set state to auto cansel in 30 to 60 minutes time
                 next_adj_time = 0;
               else
                 next_adj_time =30;
+              now.array_now = 71; // a value beond real data to use for the next 1/2 hour
               cost_array[now.array_now].plan = CHARGE;
               cost_array[now.array_now-1].plan = CHARGE; 
               implement_control(); // implement strategy when required  
@@ -654,6 +676,7 @@ if(now.min == next_adj_time) // do on the hour and 1/2 hour
                 next_adj_time = 0;
               else
                 next_adj_time =30;
+              now.array_now = 71; // a value beond real data to use for the next 1/2 hour
               cost_array[now.array_now].plan = BATTERY_SAVE;
               cost_array[now.array_now-1].plan = BATTERY_SAVE; 
               implement_control(); // implement strategy when required 
@@ -665,7 +688,7 @@ if(now.min == next_adj_time) // do on the hour and 1/2 hour
       }
 
       Serial.print("User changing power req = "); 
-      Serial.println(up_down); 
+      Serial.println(switch_state); 
       
         
     } 

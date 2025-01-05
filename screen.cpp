@@ -170,25 +170,29 @@ int8_t do_buttons(void)
   int8_t up_down =0;
   Adafruit_GFX_Button button_d;
   Adafruit_GFX_Button button_i;
-Adafruit_GFX_Button button_charge;
+  Adafruit_GFX_Button button_charge;
   Adafruit_GFX_Button button_bat_save;
-  
+  Adafruit_GFX_Button button_off;
+
   TS_Point tuched;
   tft.setCursor(15, 80);
   tft.setTextColor(ILI9341_WHITE,ILI9341_BLACK);  
   tft.setTextSize(2);	
   tft.print("Change Power to be stored");
-  button_d.initButtonUL(&tft, 30, 100, 100,45 , ILI9341_GREEN, ILI9341_LIGHTGREY,ILI9341_BLACK, "Reduse", 2);
+  button_d.initButtonUL(&tft, 10, 100, 100,45 , ILI9341_GREEN, ILI9341_LIGHTGREY,ILI9341_BLACK, "Reduse", 2);
   button_d.drawButton(true); 
 
-  button_i.initButtonUL(&tft, 200, 100, 100,45 , ILI9341_GREEN, ILI9341_LIGHTGREY,ILI9341_BLACK, "Increse", 2);
+  button_i.initButtonUL(&tft, 210, 100, 100,45 , ILI9341_GREEN, ILI9341_LIGHTGREY,ILI9341_BLACK, "Increse", 2);
   button_i.drawButton(true); 
 
-button_bat_save.initButtonUL(&tft, 30, 180, 100,45 , ILI9341_GREEN, ILI9341_LIGHTGREY,ILI9341_BLACK, "Bat Save", 2);
+button_bat_save.initButtonUL(&tft, 10, 180, 100,45 , ILI9341_GREEN, ILI9341_LIGHTGREY,ILI9341_BLACK, "Bat Save", 2);
   button_bat_save.drawButton(true); 
 
-button_charge.initButtonUL(&tft, 200, 180, 100,45 , ILI9341_GREEN, ILI9341_LIGHTGREY,ILI9341_BLACK, "Charge", 2);
+button_charge.initButtonUL(&tft, 210, 180, 100,45 , ILI9341_GREEN, ILI9341_LIGHTGREY,ILI9341_BLACK, "Charge", 2);
   button_charge.drawButton(true); 
+
+button_off.initButtonUL(&tft, 110, 140, 100,45 , ILI9341_GREEN, ILI9341_LIGHTGREY,ILI9341_BLACK, "Off", 2);
+  button_off.drawButton(true); 
 
 while(!ts.bufferEmpty())
   {
@@ -243,6 +247,14 @@ for(l=0;l<27000;l++) // a time out if nothing is pressed
     Serial.print("increse button detected*** ");
     }  
 
+if (button_off.contains(x,y) && tuched.z > 100)
+  {
+    button_off.drawButton(false);
+     Serial.println("*** off button detected *** ");
+    up_down = 5;
+    button_off.drawButton(false);
+  }  
+
 if (button_bat_save.contains(x,y) && tuched.z > 100)
   {
     button_bat_save.drawButton(false);
@@ -250,7 +262,6 @@ if (button_bat_save.contains(x,y) && tuched.z > 100)
     up_down = 20;
     button_bat_save.drawButton(false);
   }  
-
 
   if (button_charge.contains(x,y) && tuched.z > 100 )
     {
